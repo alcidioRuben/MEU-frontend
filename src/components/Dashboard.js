@@ -33,6 +33,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, doc, deleteDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import config from '../config';
 
 // Valores padrão para o formulário
 const defaultValues = {
@@ -185,66 +186,58 @@ ${newBotData.contactInfo}`;
   }
 
   async function handleDeleteBot(botId) {
-    const botToDelete = bots.find(b => b.id === botId);
-    if (!botToDelete) return;
+    if (!window.confirm('Tem certeza que deseja excluir este bot?')) {
+      return;
+    }
 
-    if (window.confirm(`Tem certeza que deseja excluir o bot ${botToDelete.name}? Esta ação não pode ser desfeita.`)) {
-      setLoading(true);
-      setError(''); // Limpar erros anteriores
-      const token = localStorage.getItem('idToken');
-      if (!token) {
-         setError('Erro de autenticação ao excluir.');
-         setLoading(false);
-         return;
+    const token = localStorage.getItem('idToken');
+    if (!token) {
+      console.error('Token não encontrado para excluir o bot');
+      return;
+    }
+
+    try {
+      // 1. Tentar parar o bot no backend (ignorar erros se já estiver parado)
+      console.log(`Tentando parar o bot ${botId} antes de excluir...`);
+      // Corrigindo a busca pelo documento pelo campo 'id' que você definiu
+      const botQuery = query(collection(db, 'bots'), where('id', '==', botId), where('userId', '==', currentUser.uid));
+      const botSnapshot = await getDocs(botQuery);
+
+      if (botSnapshot.empty) {
+        console.log(`Bot com id ${botId} não encontrado no Firestore para este usuário.`);
+        // Mesmo que não ache no firestore, tenta parar no backend pelo ID, pode existir lá
       }
 
-      try {
-        // 1. Tentar parar o bot no backend (ignorar erros se já estiver parado)
-        console.log(`Tentando parar o bot ${botId} antes de excluir...`);
-        // Corrigindo a busca pelo documento pelo campo 'id' que você definiu
-        const botQuery = query(collection(db, 'bots'), where('id', '==', botId), where('userId', '==', currentUser.uid));
-        const botSnapshot = await getDocs(botQuery);
-
-        if (botSnapshot.empty) {
-           console.log(`Bot com id ${botId} não encontrado no Firestore para este usuário.`);
-           // Mesmo que não ache no firestore, tenta parar no backend pelo ID, pode existir lá
+      const stopResponse = await fetch(`${config.apiUrl}/api/bots/${botId}/stop`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         }
-
-        const stopResponse = await fetch(`http://localhost:3001/api/bots/${botId}/stop`, {
-           method: 'POST',
-           headers: {
-             'Content-Type': 'application/json',
-             'Authorization': `Bearer ${token}`
-           }
-        });
-        if (!stopResponse.ok && stopResponse.status !== 404) {
-          // Loga o erro mas continua, a exclusão do firestore é mais importante
-          console.warn(`Falha ao parar o bot ${botId} no backend (status ${stopResponse.status}). Continuando com a exclusão...`);
-        } else {
-           console.log(`Comando de parada enviado/processado para ${botId}.`);
-        }
-
-
-        // 2. Excluir do Firestore usando o ID do documento (se encontrado)
-        if (!botSnapshot.empty) {
-           const docIdToDelete = botSnapshot.docs[0].id;
-           console.log(`Excluindo bot ${botId} (doc ID: ${docIdToDelete}) do Firestore...`);
-           await deleteDoc(doc(db, 'bots', docIdToDelete));
-        } else {
-           console.log(`Não foi possível encontrar o documento do bot ${botId} para excluir do Firestore.`);
-        }
-
-
-        // 3. Atualizar UI
-        setBots(prevBots => prevBots.filter(bot => bot.id !== botId));
-        console.log(`Bot ${botId} removido da UI.`);
-
-      } catch (error) {
-        console.error('Erro ao deletar bot:', error);
-        setError(`Falha ao excluir o bot: ${error.message || 'Erro desconhecido'}`);
-      } finally {
-        setLoading(false);
+      });
+      if (!stopResponse.ok && stopResponse.status !== 404) {
+        // Loga o erro mas continua, a exclusão do firestore é mais importante
+        console.warn(`Falha ao parar o bot ${botId} no backend (status ${stopResponse.status}). Continuando com a exclusão...`);
+      } else {
+        console.log(`Comando de parada enviado/processado para ${botId}.`);
       }
+
+      // 2. Excluir do Firestore usando o ID do documento (se encontrado)
+      if (!botSnapshot.empty) {
+        const docIdToDelete = botSnapshot.docs[0].id;
+        console.log(`Excluindo bot ${botId} (doc ID: ${docIdToDelete}) do Firestore...`);
+        await deleteDoc(doc(db, 'bots', docIdToDelete));
+      } else {
+        console.log(`Não foi possível encontrar o documento do bot ${botId} para excluir do Firestore.`);
+      }
+
+      // 3. Atualizar UI
+      setBots(prevBots => prevBots.filter(bot => bot.id !== botId));
+      console.log(`Bot ${botId} removido da UI.`);
+
+    } catch (error) {
+      console.error('Erro ao excluir bot:', error);
+      alert('Erro ao excluir o bot. Por favor, tente novamente.');
     }
   }
 

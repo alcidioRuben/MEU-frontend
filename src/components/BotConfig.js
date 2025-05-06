@@ -39,11 +39,10 @@ import { QRCodeSVG } from 'qrcode.react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import io from 'socket.io-client';
+import config from '../config';
 
 // Determina a URL do backend dinamicamente
-const backendUrl = process.env.NODE_ENV === 'production'
-  ? window.location.origin // Em produção, usa a mesma origem
-  : 'http://localhost:3001'; // Em desenvolvimento, aponta para a porta 3001
+const backendUrl = config.apiUrl;
 
 console.log(`[SocketIO] Conectando ao backend em: ${backendUrl}`);
 
@@ -82,7 +81,7 @@ const BotConfig = memo(() => {
     if (!token || !id) return;
     console.log(`Buscando números bloqueados para o bot ${id}...`);
     try {
-      const response = await fetch(`/api/bots/${id}/blocked`, {
+      const response = await fetch(`${config.apiUrl}/api/bots/${id}/blocked`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -323,51 +322,51 @@ const BotConfig = memo(() => {
     try {
       console.log(`Enviando requisição para iniciar bot ${id}...`);
         
-        const apiUrl = `http://localhost:3001/api/bots/${id}/start`;
-        console.log(`[handleStartBot] Enviando POST para: ${apiUrl}`);
-        console.log(`[handleStartBot] Com token: ${token ? 'Sim' : 'Não'}`);
+      const apiUrl = `${config.apiUrl}/api/bots/${id}/start`;
+      console.log(`[handleStartBot] Enviando POST para: ${apiUrl}`);
+      console.log(`[handleStartBot] Com token: ${token ? 'Sim' : 'Não'}`);
 
-        fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
-        })
-        .then(async response => {
-           console.log(`[handleStartBot] Resposta recebida do servidor. Status: ${response.status}`);
-           const responseBody = await response.text();
-           console.log(`[handleStartBot] Corpo da resposta: ${responseBody}`);
+      fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      .then(async response => {
+        console.log(`[handleStartBot] Resposta recebida do servidor. Status: ${response.status}`);
+        const responseBody = await response.text();
+        console.log(`[handleStartBot] Corpo da resposta: ${responseBody}`);
 
-          if (!response.ok) {
-            let errorData = { message: `Erro ${response.status}: ${response.statusText}` };
-            try {
-               errorData = JSON.parse(responseBody);
-            } catch (parseError) {
-               console.warn('[handleStartBot] Não foi possível parsear a resposta de erro como JSON.');
-               errorData.message = responseBody || errorData.message;
-            }
-
-            console.error('[handleStartBot] Erro na resposta do servidor ao iniciar:', response.status, errorData);
-            let errorMsg = errorData.message || 'Erro ao iniciar bot';
-            if (response.status === 401 || response.status === 403) {
-              errorMsg = 'Autenticação falhou. Faça login novamente.';
-              localStorage.removeItem('idToken');
-            }
-            setError(errorMsg);
-            setStarting(false);
-            setBotStatus('error');
-            return;
+        if (!response.ok) {
+          let errorData = { message: `Erro ${response.status}: ${response.statusText}` };
+          try {
+            errorData = JSON.parse(responseBody);
+          } catch (parseError) {
+            console.warn('[handleStartBot] Não foi possível parsear a resposta de erro como JSON.');
+            errorData.message = responseBody || errorData.message;
           }
 
-          console.log('Requisição para iniciar bot enviada com sucesso. Aguardando QR code...');
-        })
-        .catch(error => {
-        console.error('Erro inesperado ao tentar iniciar bot (fetch catch): ', error);
-          setError(error.message || 'Erro inesperado ao iniciar bot');
+          console.error('[handleStartBot] Erro na resposta do servidor ao iniciar:', response.status, errorData);
+          let errorMsg = errorData.message || 'Erro ao iniciar bot';
+          if (response.status === 401 || response.status === 403) {
+            errorMsg = 'Autenticação falhou. Faça login novamente.';
+            localStorage.removeItem('idToken');
+          }
+          setError(errorMsg);
           setStarting(false);
           setBotStatus('error');
-        });
+          return;
+        }
+
+        console.log('Requisição para iniciar bot enviada com sucesso. Aguardando QR code...');
+      })
+      .catch(error => {
+        console.error('Erro inesperado ao tentar iniciar bot (fetch catch): ', error);
+        setError(error.message || 'Erro inesperado ao iniciar bot');
+        setStarting(false);
+        setBotStatus('error');
+      });
 
       setTimeout(() => {
         if (!qrCode && botStatus === 'starting' && userInitiated) {
@@ -403,7 +402,7 @@ const BotConfig = memo(() => {
     }
 
     try {
-      const response = await fetch(`http://localhost:3001/api/bots/${id}/stop`, {
+      const response = await fetch(`${config.apiUrl}/api/bots/${id}/stop`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -9,10 +9,8 @@ import {
   Link,
   Alert,
   CircularProgress,
-  Divider,
-  IconButton
+  Divider
 } from '@mui/material';
-import GoogleIcon from '@mui/icons-material/Google';
 import { useAuth } from '../contexts/AuthContext';
 
 function Login() {
@@ -20,8 +18,7 @@ function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const { login, loginWithGoogle } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -37,7 +34,6 @@ function Login() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    setGoogleLoading(false);
 
     try {
       await login(email, password);
@@ -57,35 +53,6 @@ function Login() {
       }
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    setError('');
-    setGoogleLoading(true);
-    setLoading(false);
-    try {
-      await loginWithGoogle();
-      const redirectPath = sessionStorage.getItem('redirectAfterLogin') || '/';
-      console.log('Redirecionando após login com Google para:', redirectPath);
-      sessionStorage.removeItem('redirectAfterLogin');
-      navigate(redirectPath, { replace: true });
-    } catch (error) {
-      console.error('Erro no login com Google:', error);
-      
-      if (error.code === 'auth/operation-not-allowed') {
-        setError('Login com Google não está habilitado. É necessário ativar o provedor Google no console do Firebase.');
-      } else if (error.code === 'auth/popup-closed-by-user') {
-        setError('Janela de login foi fechada. Tente novamente.');
-      } else if (error.code === 'auth/cancelled-popup-request') {
-        console.log('Solicitação de popup cancelada pelo usuário');
-      } else if (error.code === 'auth/network-request-failed') {
-        setError('Erro de conexão. Verifique sua internet e tente novamente.');
-      } else {
-        setError(error.message || 'Falha ao fazer login com Google.');
-      }
-    } finally {
-      setGoogleLoading(false);
     }
   };
 
@@ -115,7 +82,7 @@ function Login() {
             autoFocus
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            disabled={loading || googleLoading}
+            disabled={loading}
           />
           <TextField
             margin="normal"
@@ -128,54 +95,17 @@ function Login() {
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            disabled={loading || googleLoading}
+            disabled={loading}
           />
           <Button
             type="submit"
             fullWidth
             variant="contained"
             sx={{ mt: 3, mb: 2 }}
-            disabled={loading || googleLoading}
+            disabled={loading}
           >
             {loading ? <CircularProgress size={24} color="inherit" /> : 'Entrar'}
           </Button>
-          <Divider sx={{ width: '100%', my: 2 }}>OU</Divider>
-          <Button
-            fullWidth
-            variant="outlined"
-            startIcon={<GoogleIcon />}
-            onClick={handleGoogleLogin}
-            disabled={loading || googleLoading}
-            sx={{ 
-              mb: 2,
-              py: 1,
-              border: '1px solid #ddd',
-              color: 'rgba(0, 0, 0, 0.87)',
-              backgroundColor: '#fff',
-              '&:hover': {
-                backgroundColor: '#f5f5f5',
-                border: '1px solid #ccc'
-              }
-            }}
-          >
-            {googleLoading ? 
-              <CircularProgress size={24} color="inherit" /> : 
-              'Entrar com Google'
-            }
-          </Button>
-          {error && error.includes('não está habilitado') && (
-            <Alert severity="info" sx={{ mb: 2, width: '100%' }}>
-              <Typography variant="body2">
-                Para habilitar o login com Google:
-                <ol style={{ margin: '0.5rem 0 0 1rem', paddingLeft: 0 }}>
-                  <li>Acesse o <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer">Console do Firebase</a></li>
-                  <li>Selecione seu projeto</li>
-                  <li>Vá em "Authentication" → "Sign-in method"</li>
-                  <li>Habilite o provedor "Google"</li>
-                </ol>
-              </Typography>
-            </Alert>
-          )}
           <Box sx={{ textAlign: 'center' }}>
             <Link component={RouterLink} to="/register" variant="body2">
               {"Não tem uma conta? Cadastre-se"}
@@ -187,4 +117,4 @@ function Login() {
   );
 }
 
-export default Login; 
+export default Login;
